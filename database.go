@@ -2,39 +2,32 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// database connection used for writes
 var DB_CONN *sql.DB
 
 // TABLES_SQL defines the main database tables
 // and trigger functions.
 var TABLES_SQL = `
-    CREATE TABLE IF NOT EXISTS uploads (
-        uid TEXT NOT NULL PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS assets (
+        asset_id TEXT NOT NULL PRIMARY KEY,
         file_name TEXT,
         create_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        update_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        update_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		is_deleted BOOLEAN DEFAULT f
     );
 
-    CREATE INDEX IF NOT EXISTS uploads__idx ON uploads(uid);
-    CREATE TRIGGER IF NOT EXISTS uploads__update
-        AFTER
-        UPDATE
-        ON uploads
-        FOR EACH ROW
-    BEGIN
-        UPDATE uploads SET update_at=CURRENT_TIMESTAMP WHERE timestamp=OLD.timestamp;
-    END;
-`
+    CREATE INDEX IF NOT EXISTS assets__idx ON assets(asset_id);
 
-var ASSET_SQL = `
-	'{'||
-		'"uid": ' ||  uid ||','||
-		'"file_name": "' ||  file_name ||'",'||
-		'"create_at": "' ||  create_at ||'",'||
-		'"update_at": "' ||  update_at
-	|| '}'
+    CREATE TRIGGER IF NOT EXISTS assets__update
+        AFTER UPDATE ON assets FOR EACH ROW
+    BEGIN
+        UPDATE assets SET update_at=CURRENT_TIMESTAMP
+            WHERE timestamp=OLD.timestamp;
+    END;
 `
 
 // MakeTables creates database tables and triggers.
@@ -49,16 +42,16 @@ func makeTables() (err error) {
 	return
 }
 
-func Insert(file_name, uid string) error {
+func Insert(file_name, asset_id string) error {
 	tx, err := DB_CONN.Begin()
 	if nil != err {
 		return err
 	}
 
 	stmt, err := tx.Prepare(`
-        INSERT OR REPLACE INTO uploads(
+        INSERT OR REPLACE INTO assets(
             file_name,
-            uid
+            asset_id
         )
         VALUES (?, ?)`)
 	if nil != err {
@@ -66,7 +59,7 @@ func Insert(file_name, uid string) error {
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(file_name, uid)
+	_, err = stmt.Exec(file_name, asset_id)
 	if nil != err {
 		return err
 	}
@@ -83,13 +76,37 @@ func Insert(file_name, uid string) error {
 	return nil
 }
 
-func init() {
-	var err error
-	DB_CONN, err = sql.Open("sqlite3", "assets.db?cache=shared&mode=rwc&_busy_timeout=50000000")
+func Select(asset_id string) (string, error) {
+	conn, _ := OpenDb()
+	defer conn.Close()
+
+	query := fmt.Sprintf(`
+        SELECT
+            %v
+        FROM
+            assets
+        WHERE
+            asset_id = ?
+    `, AssetSQL)
+
+	row := conn.QueryRow(query, asset_id)
+
+	var result string
+	err := row.Scan(&result)
+	return result, err
+}
+
+func OpenDb() (*sql.DB, error) {
+	db_conn, err := sql.Open("sqlite3", "assets.db?cache=shared&mode=rwc&_busy_timeout=50000000")
 	if err != nil {
 		logger.Error(err)
 		panic(err)
 	}
 
+	return db_conn, err
+}
+
+func init() {
+	DB_CONN, _ = OpenDb()
 	makeTables()
 }

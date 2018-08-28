@@ -27,3 +27,7 @@ func SetHeadersMiddleWare(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// func AttachMiddleWareToRouter(router) {
+// 	router.Use(LoggingMiddleWare, SetHeadersMiddleWare)
+// }

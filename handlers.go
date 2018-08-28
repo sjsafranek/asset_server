@@ -29,6 +29,10 @@ func formatApiError(err error) string {
 	return fmt.Sprintf(`{"status":"error", "error": "%v"}`, err.Error())
 }
 
+func newAssetId() string {
+	return fmt.Sprintf("%s", uuid.Must(uuid.NewV4()))
+}
+
 func FileUpload(r *http.Request) (string, int) {
 	r.ParseMultipartForm(32 << 20)
 	file, handler, err := r.FormFile("uploadfile")
@@ -39,10 +43,9 @@ func FileUpload(r *http.Request) (string, int) {
 
 	defer file.Close()
 
-	u1 := uuid.Must(uuid.NewV4())
-	uid := fmt.Sprintf("%s", u1)
+	asset_id := newAssetId()
 	ext := filepath.Ext(handler.Filename)
-	save_file_name := fmt.Sprintf("%v%v", uid, ext)
+	save_file_name := fmt.Sprintf("%v%v", asset_id, ext)
 
 	f, err := os.OpenFile(ASSETS_DIRECTORY+save_file_name, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -52,13 +55,19 @@ func FileUpload(r *http.Request) (string, int) {
 	defer f.Close()
 	io.Copy(f, file)
 
-	err = Insert(handler.Filename, uid)
+	err = Insert(handler.Filename, asset_id)
 	if nil != err {
 		logger.Error(err)
 		return formatApiError(err), http.StatusInternalServerError
 	}
 
-	return fmt.Sprintf(`{"status":"ok", "img_id": "%v"}`, uid), http.StatusOK
+	result, err := Select(asset_id)
+	if nil != err {
+		logger.Error(err)
+		return formatApiError(err), http.StatusInternalServerError
+	}
+
+	return fmt.Sprintf(`{"status":"ok", "data": %v}`, result), http.StatusOK
 }
 
 func FileUploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -77,3 +86,6 @@ func FileUploadApiV1Handler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(status_code)
 	fmt.Fprintf(w, results)
 }
+
+// TODO
+//  - DELETE
