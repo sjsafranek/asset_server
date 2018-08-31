@@ -26,7 +26,8 @@ var TABLES_SQL = `
         AFTER UPDATE ON assets FOR EACH ROW
     BEGIN
         UPDATE assets SET update_at=CURRENT_TIMESTAMP
-            WHERE timestamp=OLD.timestamp;
+            WHERE update_at = OLD.update_at;
+			--WHERE update_at != OLD.update_at;
     END;
 `
 
@@ -94,6 +95,38 @@ func Select(asset_id string) (string, error) {
 	var result string
 	err := row.Scan(&result)
 	return result, err
+}
+
+func Delete(asset_id string) error {
+	tx, err := DB_CONN.Begin()
+	if nil != err {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`
+		UPDATE assets SET is_deleted = 't'
+        WHERE
+            asset_id = ?`)
+	if nil != err {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.Exec(asset_id)
+	if nil != err {
+		return err
+	}
+
+	err_commit := tx.Commit()
+	if nil != err {
+		err_rollback := tx.Rollback()
+		if nil != err_rollback {
+			return err_rollback
+		}
+		return err_commit
+	}
+
+	return nil
 }
 
 func OpenDb() (*sql.DB, error) {

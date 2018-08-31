@@ -37,7 +37,8 @@ func main() {
 
 	// File uploader
 	router.Handle("/upload", http.HandlerFunc(FileUploadHandler)).Methods("GET", "POST")
-	router.Handle("/api/v1/upload", http.HandlerFunc(FileUploadApiV1Handler)).Methods("POST")
+	router.Handle("/api/v1/asset", http.HandlerFunc(ApiV1FileHandler)).Methods("POST")
+	router.Handle("/api/v1/asset/{asset_id}", http.HandlerFunc(ApiV1FileHandler)).Methods("GET", "DELETE")
 	//.end
 
 	router.Use(LoggingMiddleWare, SetHeadersMiddleWare)

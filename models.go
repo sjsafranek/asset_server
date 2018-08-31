@@ -12,6 +12,7 @@ var AssetSQL = `
 		'"is_deleted": ' || (
 			CASE
 				WHEN is_deleted = 1 THEN 'true'
+				WHEN is_deleted = 't' THEN 'true'
 				ELSE 'false'
 			END
 		) ||','||
